@@ -12,6 +12,13 @@ services:
     environment:
       REDIS_HOST: redis
       REDIS_PORT: 6379
+      LOG_LEVEL: ${LOG_LEVEL:-info}
+      QUEUE_NAME: ${QUEUE_NAME:-jobs}
+      JOB_ATTEMPTS: ${JOB_ATTEMPTS:-3}
+      JOB_BACKOFF_TYPE: ${JOB_BACKOFF_TYPE:-exponential}
+      JOB_BACKOFF_DELAY_MS: ${JOB_BACKOFF_DELAY_MS:-1000}
+      JOB_KEEP_COMPLETED: ${JOB_KEEP_COMPLETED:-1000}
+      JOB_KEEP_FAILED: ${JOB_KEEP_FAILED:-5000}
     depends_on:
       - redis
 
@@ -21,5 +28,12 @@ services:
     environment:
       REDIS_HOST: redis
       REDIS_PORT: 6379
+      LOG_LEVEL: ${LOG_LEVEL:-info}
+      QUEUE_NAME: ${QUEUE_NAME:-jobs}
+      WORKER_CONCURRENCY: ${WORKER_CONCURRENCY:-1}
+      JOB_TIMEOUT_MS: ${JOB_TIMEOUT_MS:-30000}
+      SIMULATED_JOB_DURATION_MS: ${SIMULATED_JOB_DURATION_MS:-2000}
+      WORKER_SHUTDOWN_TIMEOUT_MS: ${WORKER_SHUTDOWN_TIMEOUT_MS:-25000}
+    stop_grace_period: 30s
     depends_on:
       - redis
