@@ -108,3 +108,30 @@ JOB_TIMEOUT_MS=500 docker compose up --build -d
 curl -X POST localhost:3000/jobs -H 'Content-Type: application/json' -d '{"command":"sleep"}'
 docker compose logs -f worker   # 2x "will retry", then "Job failed permanently"
 ```
+
+## Deployment (single EC2 instance)
+
+`deploy/ec2/` runs the whole stack on one EC2 instance with Docker Compose:
+
+```
+Internet ──HTTP :80──▶ EC2 security group (only port 80 open)
+                         └─ Docker host (Ubuntu 24.04)
+                              ├─ api     container, host port 80 → 3000
+                              ├─ worker  container (no ports)
+                              └─ redis   container (no host ports; AOF persistence on a named volume)
+                              all three on the private Compose network; api/worker reach Redis as `redis:6379`
+```
+
+- `docker-compose.prod.yml` overrides the base file: removes Redis's published port, maps the API to host port 80, enables Redis AOF persistence (`noeviction`, as BullMQ requires), and sets `restart: unless-stopped` so containers come back after crashes and reboots.
+- `deploy/ec2/deploy.sh` uses the AWS CLI's normal credential chain (env vars, profile or SSO; nothing is stored in the repo). It creates a security group with only TCP 80 open, launches the instance with `user-data.sh`, and attaches an Elastic IP. No SSH port is opened.
+- `deploy/ec2/user-data.sh` runs on first boot. It installs Docker, clones the repo at `REPO_REF`, and runs `docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d --build`. The bootstrap log is `/var/log/cloud-job-runner-bootstrap.log`.
+
+```bash
+AWS_REGION=us-east-1 ./deploy/ec2/deploy.sh        # prints the public API URL
+curl -X POST http://<public-ip>/jobs -H 'Content-Type: application/json' -d '{"command":"echo hello"}'
+AWS_REGION=us-east-1 ./deploy/ec2/teardown.sh      # deletes the instance, Elastic IP and security group
+```
+
+Optional env vars for `deploy.sh`: `STACK_NAME` (default `cloud-job-runner`, used for names and tags), `INSTANCE_TYPE` (default `t4g.small`, ARM), `REPO_URL`, `REPO_REF` (default `main`).
+
+Limitations: plain HTTP (HTTPS needs a domain and a certificate), no authentication on `POST /jobs`, and a single host, so there is no failover.

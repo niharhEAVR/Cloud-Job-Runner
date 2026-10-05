@@ -1,0 +1,20 @@
+# Production overrides for a single-host deployment:
+#   docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d --build
+services:
+  redis:
+    ports: !reset []
+    command: ["redis-server", "--appendonly", "yes", "--maxmemory-policy", "noeviction"]
+    volumes:
+      - redis-data:/data
+    restart: unless-stopped
+
+  api:
+    ports: !override
+      - "80:3000"
+    restart: unless-stopped
+
+  worker:
+    restart: unless-stopped
+
+volumes:
+  redis-data:
